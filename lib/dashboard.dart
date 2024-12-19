@@ -36,20 +36,37 @@ class _DashboardState extends State<Dashboard> {
   }
 
   // Save name to the database
+  // Save name to the database, ensuring no duplicates
   _saveName() async {
     if (_nameController.text.isNotEmpty) {
-      final result = dbHelper.insertName(_nameController.text);
-      if (result != -1) {
-        print("Name saved successfully.");
-        _loadNames(); // Reload the names list after inserting
-        _nameController.clear();
+      // Check if the name already exists in the namesList
+      bool isDuplicate = namesList.any((item) => item['name'] == _nameController.text);
+
+      if (isDuplicate) {
+        // Show a message if the name already exists
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('This name already exists!'),
+            backgroundColor: Colors.red,
+          ),
+        );
       } else {
-        print("Failed to save the name.");
+        // Insert the name into the database
+        final int result = await dbHelper.insertName(_nameController.text);
+        if (result != -1) {
+          print("Name saved successfully.");
+          _loadNames(); // Reload the names list after inserting
+          _nameController.clear();
+        } else {
+          print("Failed to save the name.");
+        }
       }
     } else {
       print("Name input is empty.");
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {

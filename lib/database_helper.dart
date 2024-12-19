@@ -2,33 +2,47 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class AppDatabaseHelper {
-  void _loadNames() {
-    // Your logic to reload or fetch names here
-  }
+  static final AppDatabaseHelper _instance = AppDatabaseHelper._();
   static Database? _database;
 
+  AppDatabaseHelper._();
 
-  // Singleton instance for database access
+  factory AppDatabaseHelper() {
+    return _instance;
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB();
+
+    _database = await _initDatabase();
     return _database!;
   }
 
-
-  // Initialize the database
-  Future<Database> _initDB() async {
+  // Initialize the database and create tables
+  Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), 'app_database.db');
     return openDatabase(
       path,
       version: 1,
-      onCreate: (db, version) {
+      onCreate: (db, version) async {
         // Create 'names' table
-        db.execute('CREATE TABLE names(id INTEGER PRIMARY KEY, name TEXT)');
+        await db.execute('''
+          CREATE TABLE names(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT
+          )
+        ''');
+
         // Create 'transactions' table
-        db.execute(
-          'CREATE TABLE transactions(id INTEGER PRIMARY KEY, date TEXT, type TEXT, amount REAL, particular TEXT)',
-        );
+        await db.execute('''
+          CREATE TABLE transactions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            type TEXT,
+            amount REAL,
+            particular TEXT
+          )
+        ''');
       },
     );
   }
@@ -37,18 +51,14 @@ class AppDatabaseHelper {
   // NAMES TABLE METHODS
   // ==========================
 
-  Future<void> insertName(String name) async {
+  Future<int> insertName(String name) async {
     final db = await database;
-
-    await db.insert(
-      'names',
+    return await db.insert(
+      'names',  // Corrected table name
       {'name': name},
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }
-
-
-
 
   Future<void> deleteName(int id) async {
     final db = await database;
@@ -60,14 +70,11 @@ class AppDatabaseHelper {
     await db.delete('names', where: 'id = ?', whereArgs: [id]);
   }
 
-
-
   Future<bool> checkNameExists(String name) async {
     final db = await database;
-    final result = await db.query('names_table', where: 'name = ?', whereArgs: [name]);
+    final result = await db.query('names', where: 'name = ?', whereArgs: [name]);
     return result.isNotEmpty;
   }
-
 
   Future<List<Map<String, dynamic>>> getNames() async {
     final db = await database;
@@ -79,15 +86,13 @@ class AppDatabaseHelper {
   // ==========================
 
   Future<void> insertTransaction(Map<String, dynamic> transaction) async {
-    final db = await database; // Obtain the database instance
+    final db = await database;
     await db.insert(
-      'transactions',         // Table name
-      transaction,            // Data to insert
+      'transactions',  // Corrected table name
+      transaction,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
-
-
 
   Future<List<Map<String, dynamic>>> getAllTransactions() async {
     final db = await database;
@@ -109,13 +114,11 @@ class AppDatabaseHelper {
 
   Future<List<Map<String, dynamic>>> loadNamesWithBalances() async {
     final db = await database;
-
     final names = await db.query('names');
     List<Map<String, dynamic>> updatedList = [];
 
     for (var nameData in names) {
-      final transactions = await getTransactionsByName(
-          nameData['name'].toString());
+      final transactions = await getTransactionsByName(nameData['name'].toString());
 
       double credit = 0.0;
       double debit = 0.0;
@@ -150,8 +153,7 @@ class AppDatabaseHelper {
   ''');
 
     if (result.isNotEmpty) {
-      double totalCredit = (result[0]['totalCredit'] as num?)?.toDouble() ??
-          0.0;
+      double totalCredit = (result[0]['totalCredit'] as num?)?.toDouble() ?? 0.0;
       double totalDebit = (result[0]['totalDebit'] as num?)?.toDouble() ?? 0.0;
       double totalBalance = totalCredit - totalDebit;
 
@@ -165,6 +167,19 @@ class AppDatabaseHelper {
     return {'totalCredit': 0.0, 'totalDebit': 0.0, 'totalBalance': 0.0};
   }
 
+  // ==========================
+  // DATABASE MAINTENANCE METHODS
+  // ==========================
 
+  Future<void> checkDatabaseTables() async {
+    final db = await database;
+    var result = await db.rawQuery('SELECT name FROM sqlite_master WHERE type="table"');
+    print('Tables in database: $result');
+  }
 
+  // Method to delete the entire database file
+  Future<void> deleteDatabaseFile() async {
+    final path = join(await getDatabasesPath(), 'app_database.db');
+    await deleteDatabase(path); // Correct function usage
+  }
 }
