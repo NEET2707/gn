@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'my_drawer_header.dart';
 import 'database_helper.dart'; // Import the DatabaseHelper class
 import 'creditpage.dart';
 import 'namesearchdelegate.dart';
+import 'package:open_file/open_file.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -31,9 +38,11 @@ class _DashboardState extends State<Dashboard> {
   // Load names along with their credit, debit, and balance
   _loadNames() async {
     namesList = await dbHelper.loadNamesWithBalances();
+    print("Names List: $namesList"); // Debug print
     filteredNamesList = namesList; // Set initial filtered list as all names
     setState(() {});
   }
+
 
   _filterNames() {
     String searchQuery = _searchController.text.toLowerCase();
@@ -78,6 +87,63 @@ class _DashboardState extends State<Dashboard> {
   }
 
 
+  void _saveAsPdf() {
+    print("Saving as PDF...");
+    // Add logic to generate and save the PDF
+  }
+
+
+  Future<void> requestStoragePermissions() async {
+    // Request storage permission
+    var status = await Permission.storage.request();
+    if (status.isDenied || status.isPermanentlyDenied) {
+      throw Exception("Storage permission is required to save the PDF.");
+    }
+  }
+
+
+  Future<void> generatePDF() async {
+    // Request permissions
+    await requestStoragePermissions();
+
+    final pdf = pw.Document();
+
+    // Add content to the PDF
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Center(
+            child: pw.Text(
+              'Hello, this is your PDF!',
+              style: pw.TextStyle(fontSize: 40),
+            ),
+          );
+        },
+      ),
+    );
+
+    // Get the Downloads directory
+    final outputDir = Directory('/storage/emulated/0/Download');
+
+    if (!outputDir.existsSync()) {
+      outputDir.createSync(recursive: true);
+    }
+
+    final outputFile = File("${outputDir.path}/neettest.pdf");
+
+    // Write the PDF document to the file
+    await outputFile.writeAsBytes(await pdf.save());
+
+    print("PDF saved to: ${outputFile.path}");
+
+    // Open the file to notify the user
+    await OpenFile.open(outputFile.path);
+  }
+
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -103,12 +169,23 @@ class _DashboardState extends State<Dashboard> {
             },
           ),
 
-          IconButton(
+          PopupMenuButton<String>(
             icon: Icon(Icons.more_vert, color: Colors.white),
-            onPressed: () {
-              print("More options pressed!");
+            onSelected: (String value) {
+              if (value == 'save_as_pdf') {
+                generatePDF();
+                _saveAsPdf();
+              }
             },
+            itemBuilder: (BuildContext context) => [
+              PopupMenuItem(
+                value: 'save_as_pdf',
+                child: Text('Save as PDF'),
+              ),
+
+            ],
           ),
+
         ],
       ),
 
@@ -126,7 +203,7 @@ class _DashboardState extends State<Dashboard> {
 
       // Floating Action Button
       floatingActionButton: Material(
-        color: Color(0xFF5C9EAD), // Button color
+        color: Color(0xF80CBC4), // Button color
         shape: CircleBorder(), // Circular shape
         elevation: 6.0, // Shadow/elevation
         child: InkWell(
@@ -269,11 +346,38 @@ class _DashboardState extends State<Dashboard> {
                         IconButton(
                           icon: Icon(Icons.delete, size: 20),
                           onPressed: () async {
-                            int idToDelete = nameData['id'];
-                            await dbHelper.deleteName(idToDelete);
-                            _loadNames();
+                            bool? confirmDelete = await showDialog<bool>(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: Text("Confirm Deletion"),
+                                  content: Text("Are you sure you want to delete this item?"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(context).pop(false); // User cancelled deletion
+                                      },
+                                      child: Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(context).pop(true); // User confirmed deletion
+                                      },
+                                      child: Text("Delete"),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+
+                            if (confirmDelete == true) {
+                              int idToDelete = nameData['id'];
+                              await dbHelper.deleteName(idToDelete);
+                              _loadNames();
+                            }
                           },
                         ),
+
                       ],
                     ),
                   ),
@@ -282,9 +386,9 @@ class _DashboardState extends State<Dashboard> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildInfoBox('Credit (+)', nameData['credit'].toString()),
-                        _buildInfoBox('Debit (-)', nameData['debit'].toString()),
-                        _buildInfoBox('Balance', nameData['balance'].toString()),
+                        _buildInfoBox('Credit (+)', nameData['credit']?.toString() ?? '0'),
+                        _buildInfoBox('Debit (-)', nameData['debit']?.toString() ?? '0'),
+                        _buildInfoBox('Balance', nameData['balance']?.toString() ?? '0'),
                       ],
                     ),
                   ),
