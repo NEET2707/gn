@@ -41,13 +41,14 @@ class _MyHeaderDrawerState extends State<MyHeaderDrawer> {
         children: [
           // Profile Image (Optional)
           Container(
-            margin: EdgeInsets.only(bottom: 10.0),
+            margin: EdgeInsets.only(top: 10.0),
             height: 70,
+            width: 70, // Make sure the width and height are equal for a perfect circle
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               image: DecorationImage(
-                image: AssetImage('assets/image/ram.jpg'),
-                fit: BoxFit.cover,
+                image: AssetImage('assets/image/GN.png'),
+                fit: BoxFit.cover, // Ensures the image fills the circle while preserving aspect ratio
               ),
             ),
           ),

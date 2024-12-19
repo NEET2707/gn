@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'my_drawer_header.dart';
 import 'database_helper.dart'; // Import the DatabaseHelper class
 import 'creditpage.dart';
+import 'namesearchdelegate.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -14,7 +15,11 @@ class _DashboardState extends State<Dashboard> {
   var currentPage = DrawerSection.dashboard; // Define currentPage here
   final TextEditingController _nameController = TextEditingController();
   List<Map<String, dynamic>> namesList = []; // List to store both name and id
+  final TextEditingController _searchController = TextEditingController(); // Controller for search
+  List<Map<String, dynamic>> filteredNamesList = []; // List for filtered names
   final dbHelper = AppDatabaseHelper();
+
+
 
   @override
   void initState() {
@@ -25,15 +30,21 @@ class _DashboardState extends State<Dashboard> {
   // Load names from the database
   // Load names along with their credit, debit, and balance
   _loadNames() async {
-    // Fetch names with balances from the database
     namesList = await dbHelper.loadNamesWithBalances();
-
-    // Print fetched data for debugging
-    print("Fetched names with balances: $namesList");
-
-    // Update the UI by setting the state
+    filteredNamesList = namesList; // Set initial filtered list as all names
     setState(() {});
   }
+
+  _filterNames() {
+    String searchQuery = _searchController.text.toLowerCase();
+    setState(() {
+      filteredNamesList = namesList
+          .where((nameData) =>
+          nameData['name'].toLowerCase().contains(searchQuery))
+          .toList();
+    });
+  }
+
 
   // Save name to the database
   // Save name to the database, ensuring no duplicates
@@ -88,9 +99,10 @@ class _DashboardState extends State<Dashboard> {
           IconButton(
             icon: Icon(Icons.search, color: Colors.white),
             onPressed: () {
-              print("Search icon pressed!");
+              Navigator.push(context, MaterialPageRoute(builder: (context) => SearchPage(),));
             },
           ),
+
           IconButton(
             icon: Icon(Icons.more_vert, color: Colors.white),
             onPressed: () {
@@ -221,9 +233,9 @@ class _DashboardState extends State<Dashboard> {
 
       // Displaying the List of Names
       body: ListView.builder(
-        itemCount: namesList.length,
+        itemCount: filteredNamesList.length,
         itemBuilder: (context, index) {
-          final nameData = namesList[index];
+          final nameData = filteredNamesList[index];
           return Card(
             margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
             elevation: 5,
@@ -231,19 +243,15 @@ class _DashboardState extends State<Dashboard> {
               onTap: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => CreditPage(name: nameData['name']),
-                  ),
+                  MaterialPageRoute(builder: (context) => CreditPage(name: nameData['name'])),
                 );
-
-                // Reload the data after returning from CreditPage
                 _loadNames();
               },
               child: Column(
                 children: [
                   ListTile(
                     title: Text(
-                      nameData['name'], // Display name
+                      nameData['name'],
                       style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
                     ),
                     trailing: Row(
@@ -252,22 +260,23 @@ class _DashboardState extends State<Dashboard> {
                         IconButton(
                           icon: Icon(Icons.edit_note, size: 20),
                           onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => CreditPage(name: nameData['name'])),
+                            );
                           },
-
                         ),
                         IconButton(
                           icon: Icon(Icons.delete, size: 20),
                           onPressed: () async {
                             int idToDelete = nameData['id'];
                             await dbHelper.deleteName(idToDelete);
-                            _loadNames(); // Reload data after deletion
+                            _loadNames();
                           },
                         ),
                       ],
                     ),
                   ),
-
-                  // Credit, Debit, and Balance Data Section
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: Row(
@@ -285,6 +294,7 @@ class _DashboardState extends State<Dashboard> {
           );
         },
       ),
+
 
 
     );

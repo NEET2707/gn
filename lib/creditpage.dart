@@ -137,15 +137,17 @@ class _CreditPageState extends State<CreditPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // Date Input
-                              TextField(
-                                controller: _dateController,
-                                readOnly: true,
-                                decoration: InputDecoration(
-                                  labelText: 'Transaction Date',
-                                  border: OutlineInputBorder(),
-                                  suffixIcon: Icon(Icons.calendar_today),
+                              InkWell(
+                                child: TextField(
+                                  controller: _dateController,
+                                  readOnly: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Transaction Date',
+                                    border: OutlineInputBorder(),
+                                    suffixIcon: Icon(Icons.calendar_today),
+                                  ),
+                                  onTap: () => _selectDate(context),
                                 ),
-                                onTap: () => _selectDate(context),
                               ),
                               SizedBox(height: 16),
 
@@ -200,9 +202,24 @@ class _CreditPageState extends State<CreditPage> {
                               // Save Button
                               ElevatedButton(
                                 onPressed: () async {
-                                  await _saveTransaction(); // Call the save method
-                                  Navigator.pop(context);  // Close the dialog
-                                  setState(() {});         // Refresh the UI
+                                  // Form Validation
+                                  if (_dateController.text.isEmpty ||
+                                      _transactionType == null ||
+                                      _amountController.text.isEmpty ||
+                                      _particularController.text.isEmpty) {
+                                    // Show error message if any field is empty
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Please fill in all fields.'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  } else {
+                                    // Proceed to save the transaction
+                                    await _saveTransaction(); // Call the save method
+                                    Navigator.pop(context); // Close the dialog
+                                    setState(() {}); // Refresh the UI
+                                  }
                                 },
                                 child: Text('Save Transaction'),
                               ),
@@ -214,6 +231,7 @@ class _CreditPageState extends State<CreditPage> {
                   );
                 },
               );
+
             },
           ),
           IconButton(onPressed: (){
