@@ -93,52 +93,161 @@ class _DashboardState extends State<Dashboard> {
   }
 
 
+
+  Future<String?> getDownloadDirectory() async {
+    final directory = await getExternalStorageDirectory();
+    if (directory == null) {
+      // Handle the case where the directory is null
+      print("External storage directory not found.");
+      return null;
+    }
+    return directory.path; // Safely access the path
+  }
+
   Future<void> requestStoragePermissions() async {
-    // Request storage permission
-    var status = await Permission.storage.request();
-    if (status.isDenied || status.isPermanentlyDenied) {
-      throw Exception("Storage permission is required to save the PDF.");
+    if (await Permission.storage.request().isGranted) {
+      // Permission granted
+    } else {
+      // Handle the case where permission is denied
+      print('Storage permission is denied');
     }
   }
+
 
 
   Future<void> generatePDF() async {
-    // Request permissions
-    await requestStoragePermissions();
+    try {
+      // Request permissions
+      await requestStoragePermissions();
 
-    final pdf = pw.Document();
+      final pdf = pw.Document();
 
-    // Add content to the PDF
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Center(
-            child: pw.Text(
-              'Hello, this is your PDF!',
-              style: pw.TextStyle(fontSize: 40),
-            ),
-          );
-        },
-      ),
-    );
+      // Add a title to the PDF
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Dashboard Data',
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  columnWidths: {
+                    0: pw.FlexColumnWidth(2), // Name column
+                    1: pw.FlexColumnWidth(1), // Credit column
+                    2: pw.FlexColumnWidth(1), // Debit column
+                    3: pw.FlexColumnWidth(1), // Balance column
+                  },
+                  children: [
+                    pw.TableRow(
+                      decoration: pw.BoxDecoration(color: PdfColors.grey300),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8.0),
+                          child: pw.Text(
+                            'Name',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8.0),
+                          child: pw.Text(
+                            'Credit',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8.0),
+                          child: pw.Text(
+                            'Debit',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8.0),
+                          child: pw.Text(
+                            'Balance',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    ...namesList.map((nameData) {
+                      return pw.TableRow(
+                        children: [
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8.0),
+                            child: pw.Text(nameData['name']),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8.0),
+                            child: pw.Text(nameData['credit']?.toString() ?? '0'),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8.0),
+                            child: pw.Text(nameData['debit']?.toString() ?? '0'),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(8.0),
+                            child: pw.Text(nameData['balance']?.toString() ?? '0'),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
 
-    // Get the Downloads directory
-    final outputDir = Directory('/storage/emulated/0/Download');
+      // Get download directory path
+      final outputDir = await getDownloadDirectory();
+      if (outputDir == null) {
+        // Handle the case where directory is null
+        print("Unable to get download directory.");
+        return;
+      }
 
-    if (!outputDir.existsSync()) {
-      outputDir.createSync(recursive: true);
+      // Save the PDF file to the Downloads directory
+      final outputFile = File("${outputDir}/Dashboard_Data.pdf");
+
+      await outputFile.writeAsBytes(await pdf.save());
+
+      print("PDF saved to: ${outputFile.path}");
+
+      // Notify the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PDF saved to Downloads folder'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Open the PDF file
+      await OpenFile.open(outputFile.path);
+    } catch (e) {
+      print("Error generating PDF: $e");
+
+      // Show an error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save PDF: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-
-    final outputFile = File("${outputDir.path}/neettest.pdf");
-
-    // Write the PDF document to the file
-    await outputFile.writeAsBytes(await pdf.save());
-
-    print("PDF saved to: ${outputFile.path}");
-
-    // Open the file to notify the user
-    await OpenFile.open(outputFile.path);
   }
+
+
+
+
 
 
 
